@@ -1,0 +1,253 @@
+мне нужен фронтенд без typescript задача такая строгий дезайн
+navbar логин(перебрасывает на http://127.0.0.1:8000/admin/login/?next=<url откуда был сделан запрос>) и админка(перебрасывает на http://127.0.0.1:8000/admin)
+главная страница:
+поле выбора даты с по в рууском варинате d.m.Y
+5 кнопок c тестом в зависимости от выбранного показываеться определенный отчет:
+1 отчет Список лиц , проживающих на территории Брюшлинское сельское поселение
+2 отчет Численность населения по возрасту
+3 отчет Справка о численности населения в Брюшлинском сельском поселении до 18 лет (образец в цифрах)
+4 отчет Учет граждан, пребывающих в воинском запасе в Брюшлинском сельском поселении
+5 отчет Характеристика военно-учетных признаков граждан, пребывающих в запасе в Брюшлинском сельском
+
+api:
+http://127.0.0.1:8000/api/people/humans/
+данные типа:
+{
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "job": null,
+            "document": {
+                "id": 1,
+                "document_type": {
+                    "id": 1,
+                    "name": "Пасспорт"
+                },
+                "series": "3915",
+                "nomer": 32,
+                "issued": "МВД",
+                "date": "2025-04-02"
+            },
+            "registration": {
+                "id": 1,
+                "address": "fsdfdsf",
+                "registered_from": "2020-04-07",
+                "registered_to": "2025-04-03"
+            },
+            "invalidity": null,
+            "military": {
+                "id": 1,
+                "rank": "warrant",
+                "soldier_rank": "warrant_officer",
+                "military_district": "navy",
+                "military_account_type": "special",
+                "stock_category": 1,
+                "military_category": 1,
+                "human": 1
+            },
+            "name": "Дамир",
+            "surname": "Сахбиев",
+            "patronymic": "Гамисович",
+            "gender": "W",
+            "marital_status": "S",
+            "education": "P",
+            "birthday": "2003-04-03",
+            "unemployment_reason": "student",
+            "other_reason": null
+        },
+        {
+            "id": 2,
+            "job": {
+                "id": 1,
+                "place": "OTS",
+                "sphere": "SP",
+                "profession": "rere",
+                "date": "2025-04-03"
+            },
+            "document": {
+                "id": 2,
+                "document_type": {
+                    "id": 1,
+                    "name": "Пасспорт"
+                },
+                "series": "rew",
+                "nomer": 232,
+                "issued": "МВД",
+                "date": "2025-04-03"
+            },
+            "registration": {
+                "id": 2,
+                "address": "err",
+                "registered_from": "2025-04-03",
+                "registered_to": "2025-04-03"
+            },
+            "invalidity": {
+                "id": 2,
+                "group": 1,
+                "reason": "chernobyl",
+                "details": null,
+                "human": 2
+            },
+            "military": null,
+            "name": "fdsf",
+            "surname": "Сахбиев",
+            "patronymic": "Гамисович",
+            "gender": "M",
+            "marital_status": "S",
+            "education": "P",
+            "birthday": "2025-04-03",
+            "unemployment_reason": null,
+            "other_reason": null
+        }
+    ]
+}
+class HumanListView(ListAPIView):
+    serializer_class = HumanSerializer
+    pagination_class = CustomPagination
+    permission_classes = (AllowAny,)
+
+    def get_queryset(self):
+        queryset = Human.objects.all()
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        if start_date and end_date:
+            queryset = queryset.filter(birthday__range=[start_date, end_date])
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        no_pagination = request.query_params.get("no_pagination", False)
+
+        if no_pagination:
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+что нам это дает:
+есть данные которые указа и который не указани
+есть start_date и end_date в запросе которык указывают с какого по какой
+так же есть возможность отключить погинацию где это надо 
+пагницаия нужна только в 1 и 4 отчете
+какие отчеты можно увидеть на картинка
+1 отчет: просто список с датами рождения
+2 отчет: группировка по датерождения записываеться только количество
+3 отчет: группировка по полу и возрасту тоже количество только записываеться
+4 отчет: только те что военнообязаны то есть поле military не пустое
+5 отчет: только те что военнообязаны то есть поле military не пустое и called = false
+
+соотвествие данных с api
+class GenderChoices(TextChoices):
+    M = "M", "Мужщина"
+    W = "W", "Женщина"
+
+
+class MaritalStatusChoices(TextChoices):
+    S = "S", "Холост/Не замужем"
+    M = "M", "В браке"
+
+
+class PlaceJobChoices(TextChoices):
+    IRS = "IRS", "В сельском поселении"
+    OTS = "OTS", "за пределами поселения"
+    OTA = "OTA", "за пределами района"
+
+
+class SphereJob(TextChoices):
+    E = "E", "Образование"
+    SP = "SP", "социальная защита"
+    H = "H", "Здравоохранение"
+    C = "C", "Культура"
+    T = "T", "Торговля"
+    IP = "IP", "ИП"
+    OT = "O", "Прочее"
+
+
+class EducationChoices(TextChoices):
+    P = "P", "дошкольное"
+    H = "H", "начальное общее"
+    IG = "IG", "основное общее"
+    BG = "BG", "среднее общее"
+    AO = "AO", "среднее профессиональное"
+    SV = "SV", "высшее"
+
+
+class Group(IntegerChoices):
+    GROUP_1 = 1, "1 группа"
+    GROUP_2 = 2, "2 группа"
+    GROUP_3 = 3, "3 группа"
+
+
+class Reason(TextChoices):
+    VOV = "vov", "Инвалиды, участники ВОВ"
+    COMBAT = "combat", "Участники боевых действий"
+    CHERNOBYL = "chernobyl", "Чернобыльцы"
+    DISEASE = "disease", "По заболеванию"
+    OTHER = "other", "Другое"
+
+
+class MilitaryPersonnel(TextChoices):
+    WARRANT_OFFICER = "warrant", "Прапорщик (мичман)"
+    SERGEANT = "sergeant", "Сержант (старшина)"
+    SOLDIER = "soldier", "Солдат (матрос)"
+
+
+class Rank(TextChoices):
+    PRIVATE = "private", "Рядовой"
+    CORPORAL = "corporal", "Ефрейтор"
+    JUNIOR_SERGEANT = "junior_sergeant", "Младший сержант"
+    SERGEANT = "sergeant", "Сержант"
+    SENIOR_SERGEANT = "senior_sergeant", "Старший сержант"
+    CHIEF = "chief", "Старшина"
+    WARRANT_OFFICER = "warrant_officer", "Прапорщик"
+    SENIOR_WARRANT_OFFICER = "senior_warrant_officer", "Старший прапорщик"
+
+
+class MilitaryDistrict(TextChoices):
+    ARMY = "army", "РА"
+    NAVY = "navy", "ВМФ"
+
+
+class MilitaryAccountType(TextChoices):
+    GENERAL = "general", "Общий"
+    SPECIAL = "special", "Специальный"
+
+
+class StockCategory(IntegerChoices):
+    GROUP_1 = 1, "1"
+    GROUP_2 = 2, "2"
+
+
+class MilitaryCategory(IntegerChoices):
+    GROUP_1 = 1, "1"
+    GROUP_2 = 2, "2"
+    GROUP_3 = 3, "3"
+
+
+class UnemploymentReason(TextChoices):
+    STUDENT = "student", "Студент"
+    MATERNITY_LEAVE = "maternity_leave", "В декретном отпуске"
+    CARE_FOR_SICK = "care_for_sick", "По уходу за больным"
+    DISABILITY = "disability", "Инвалиды по заболеванию"
+    EMPLOYED = "employed", "Трудоустраиваются"
+    ARMY = "army", "В рядах РА"
+    IMPRISONED = "imprisoned", "В местах заключения"
+    SEASONAL_WORK = "seasonal_work", "На сезонных работах"
+    UNEMPLOYED = (
+        "unemployed",
+        "Безработные, стоящие на учёте в центре занятости",
+    )
+    LONG_TERM_UNEMPLOYED = "long_term_unemployed", "Неработающие более 3 лет"
+    OTHER = "other", "Другое"
+
+добавить возможность выгружать таблицу в excel для 1 и 4 отчета где есть пагинация надо сделать полный запрос и уже потом от пришедших данных сформировать таблицу
