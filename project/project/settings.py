@@ -16,10 +16,12 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     "localhost",
+    "127.0.0.1"
 ]
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:8080"]
-CORS_ALLOWED_ORIGINS = ["http://localhost:8080"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
+CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+CORS_ALLOW_CREDENTIALS = True
 
 
 INSTALLED_APPS = [
