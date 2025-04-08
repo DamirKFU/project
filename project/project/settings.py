@@ -12,17 +12,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = getenv("SECRET_KEY")
 
-DEBUG = True
+DEBUG = getenv("DEBUG") != "False"
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1"
-]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+CSRF_TRUSTED_ORIGINS = ["https://127.0.0.1:443", "https://127.0.0.1"]
+CORS_ALLOWED_ORIGINS = ["https://127.0.0.1:443"]
 CORS_ALLOW_CREDENTIALS = True
-
+f = 1
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -32,6 +29,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "users",
     "corsheaders",
     "people",
     "api",
@@ -113,7 +111,8 @@ USE_I18N = True
 USE_TZ = True
 
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/django/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -121,3 +120,6 @@ if DEBUG:
     INSTALLED_APPS.append("debug_toolbar")
     MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
     INTERNAL_IPS = getenv("DJANGO_INTERNAL_IPS", "127.0.0.1").split(",")
+
+
+ADMINS = [("admin", "")]

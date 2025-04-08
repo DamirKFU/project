@@ -3,3 +3,4 @@ django-cors-headers==4.4.0
 django-cleanup==8.1.0
 python-dotenv==1.0.1
 djangorestframework==3.16.0
+gunicorn==23.0.0

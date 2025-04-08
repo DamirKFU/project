@@ -148,7 +148,7 @@ const Reports = () => {
           const gender = person.gender;
 
           for (let i = 0; i < ageGroups.length; i++) {
-            if (age <= ageGroups[i].max) {
+            if (age < ageGroups[i].max) {
               counts[gender][i]++;
             }
           }
