@@ -189,40 +189,60 @@ const Reports = () => {
 
         const militaryData = rawData.filter(person => person.military && !person.military.called);
 
-        const getCounts = (category, personnel, accountType = null) => {
+        const getCounts = (category, personnel, accountType = null, gender = null) => {
           const armyCount = militaryData.filter(p => 
-            p.military.military_category === category &&
-            p.military.rank === personnel &&
+            (category === null || p.military.military_category === category) &&
+            (personnel === null || p.military.rank === personnel) &&
             p.military.military_district === 'army' &&
-            (accountType ? p.military.military_account_type === accountType : true)
+            (accountType === null || p.military.military_account_type === accountType) &&
+            (gender === null || p.gender === gender)
           ).length;
 
           const navyCount = militaryData.filter(p => 
-            p.military.military_category === category &&
-            p.military.rank === personnel &&
+            (category === null || p.military.military_category === category) &&
+            (personnel === null || p.military.rank === personnel) &&
             p.military.military_district === 'navy' &&
-            (accountType ? p.military.military_account_type === accountType : true)
+            (accountType === null || p.military.military_account_type === accountType) &&
+            (gender === null || p.gender === gender)
           ).length;
 
           return [armyCount, navyCount, armyCount + navyCount];
         };
 
+        // Мужчины
         for (const category of categories) {
           result.push([`${category} разряд`, 'Всего', 
-            ...getCounts(category, null),
-            ...getCounts(category, null, 'general'),
-            ...getCounts(category, null, 'special')
+            ...getCounts(category, null, null, 'M'),
+            ...getCounts(category, null, 'general', 'M'),
+            ...getCounts(category, null, 'special', 'M')
           ]);
 
           for (const personnel of militaryPersonnel) {
             result.push([
               '',
               getMilitaryPersonnelDisplay(personnel),
-              ...getCounts(category, personnel),
-              ...getCounts(category, personnel, 'general'),
-              ...getCounts(category, personnel, 'special')
+              ...getCounts(category, personnel, null, 'M'),
+              ...getCounts(category, personnel, 'general', 'M'),
+              ...getCounts(category, personnel, 'special', 'M')
             ]);
           }
+        }
+
+        // Женщины
+        result.push(['Женщины', 'Всего', 
+          ...getCounts(null, null, null, 'W'),
+          ...getCounts(null, null, 'general', 'W'),
+          ...getCounts(null, null, 'special', 'W')
+        ]);
+
+        for (const personnel of militaryPersonnel) {
+          result.push([
+            '',
+            getMilitaryPersonnelDisplay(personnel),
+            ...getCounts(null, personnel, null, 'W'),
+            ...getCounts(null, personnel, 'general', 'W'),
+            ...getCounts(null, personnel, 'special', 'W')
+          ]);
         }
 
         return result;
@@ -373,11 +393,26 @@ const Reports = () => {
       } else if (activeReport === 3) {
         ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }];
       } else if (activeReport === 4) {
+        // Calculate row numbers for each category
+        const firstCategoryStart = 2;
+        const secondCategoryStart = firstCategoryStart + 4;
+        const thirdCategoryStart = secondCategoryStart + 4;
+        const womenStart = thirdCategoryStart + 4;
+
         ws['!merges'] = [
+          // Header merges
           { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
           { s: { r: 1, c: 2 }, e: { r: 1, c: 4 } },
           { s: { r: 1, c: 5 }, e: { r: 1, c: 7 } },
-          { s: { r: 1, c: 8 }, e: { r: 1, c: 10 } }
+          { s: { r: 1, c: 8 }, e: { r: 1, c: 10 } },
+          // First category merges
+          { s: { r: firstCategoryStart, c: 0 }, e: { r: firstCategoryStart + 3, c: 0 } },
+          // Second category merges
+          { s: { r: secondCategoryStart, c: 0 }, e: { r: secondCategoryStart + 3, c: 0 } },
+          // Third category merges
+          { s: { r: thirdCategoryStart, c: 0 }, e: { r: thirdCategoryStart + 3, c: 0 } },
+          // Women category merges
+          { s: { r: womenStart, c: 0 }, e: { r: womenStart + 3, c: 0 } }
         ];
       }
 
