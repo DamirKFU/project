@@ -33,76 +33,218 @@ const Reports = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const formatPerson = (person) => {
-    return {
-      'ФИО': `${person.surname} ${person.name} ${person.patronymic}`,
-      'Дата рождения': format(new Date(person.birthday), 'dd.MM.yyyy'),
-      'Пол': person.gender === 'M' ? 'Мужской' : 'Женский',
-      'Образование': person.education,
-      'Адрес': person.registration?.address || '-',
-      'Документ': `${person.document?.document_type?.name || '-'} ${person.document?.series || '-'} ${person.document?.nomer || '-'}`,
-      'Военный билет': person.military ? 'Есть' : 'Нет',
-      'Работа': person.job?.place || '-'
+  const getRankDisplay = (rank) => {
+    const ranks = {
+      'private': 'Рядовой',
+      'corporal': 'Ефрейтор',
+      'junior_sergeant': 'Младший сержант',
+      'sergeant': 'Сержант',
+      'senior_sergeant': 'Старший сержант',
+      'chief': 'Старшина',
+      'warrant_officer': 'Прапорщик',
+      'senior_warrant_officer': 'Старший прапорщик'
     };
+    return ranks[rank] || '-';
+  };
+
+  const getMilitaryPersonnelDisplay = (personnel) => {
+    const types = {
+      'warrant': 'Прапорщик (мичман)',
+      'sergeant': 'Сержант (старшина)',
+      'soldier': 'Солдат (матрос)'
+    };
+    return types[personnel] || '-';
+  };
+
+  const getAccountTypeDisplay = (type) => {
+    return type === 'general' ? 'Общий' : 'Специальный';
   };
 
   const processData = (rawData, reportIndex) => {
     switch (reportIndex) {
-      case 0: // Список лиц
-        return rawData.map(formatPerson);
-      case 1: // Численность по возрасту
-        const ageGroups = {};
+      case 0:
+        return rawData.map(person => ({
+          'ФИО': `${person.surname} ${person.name} ${person.patronymic}`,
+          'Дата рождения': format(new Date(person.birthday), 'dd.MM.yyyy')
+        }));
+      case 1: {
+        const ageRanges = [
+          { name: 'До 1 года', min: 0, max: 1 },
+          { name: 'С 1 года до 2 лет', min: 1, max: 2 },
+          { name: 'С 2 лет до 3 лет', min: 2, max: 3 },
+          { name: 'С 3 лет до 5 лет', min: 3, max: 5 },
+          { name: 'С 5 лет до 7 лет', min: 5, max: 7 },
+          { name: 'С 7 лет до 14 лет', min: 7, max: 14 },
+          { name: 'С 14 лет до 16 лет', min: 14, max: 16 },
+          { name: 'С 16 лет до 18 лет', min: 16, max: 18 },
+          { name: 'С 18 лет до 20 лет', min: 18, max: 20 },
+          { name: 'С 20 лет до 24 лет', min: 20, max: 24 },
+          { name: 'С 24 лет до 28 лет', min: 24, max: 28 },
+          { name: 'С 28 лет до 30 лет', min: 28, max: 30 },
+          { name: 'С 30 лет до 35 лет', min: 30, max: 35 },
+          { name: 'С 35 лет до 40 лет', min: 35, max: 40 },
+          { name: 'С 40 лет до 45 лет', min: 40, max: 45 },
+          { name: 'С 45 лет до 50 лет', min: 45, max: 50 },
+          { name: 'С 50 лет до 55 лет', min: 50, max: 55 },
+          { name: 'С 55 лет до 60 лет', min: 55, max: 60 },
+          { name: 'С 60 лет до 65 лет', min: 60, max: 65 },
+          { name: 'С 65 лет до 70 лет', min: 65, max: 70 },
+          { name: 'Старше 70 лет', min: 70, max: Infinity }
+        ];
+
+        const counts = {
+          M: Array(ageRanges.length).fill(0),
+          W: Array(ageRanges.length).fill(0)
+        };
+        let totalM = 0;
+        let totalW = 0;
+
         rawData.forEach(person => {
           const birthDate = new Date(person.birthday);
           const age = new Date().getFullYear() - birthDate.getFullYear();
-          ageGroups[age] = (ageGroups[age] || 0) + 1;
-        });
-        return Object.entries(ageGroups)
-          .sort(([age1], [age2]) => Number(age1) - Number(age2))
-          .map(([age, count]) => ({
-            'Возраст': age,
-            'Количество': count
-          }));
-      case 2: // До 18 лет
-        const genderGroups = { M: {}, W: {} };
-        rawData.forEach(person => {
-          const birthDate = new Date(person.birthday);
-          const age = new Date().getFullYear() - birthDate.getFullYear();
-          if (age < 18) {
-            genderGroups[person.gender][age] = (genderGroups[person.gender][age] || 0) + 1;
+          const gender = person.gender;
+
+          const rangeIndex = ageRanges.findIndex(range => age >= range.min && age < range.max);
+          if (rangeIndex !== -1) {
+            counts[gender][rangeIndex]++;
+            if (gender === 'M') totalM++;
+            else totalW++;
           }
         });
-        return Object.entries(genderGroups)
-          .flatMap(([gender, ages]) =>
-            Object.entries(ages)
-              .sort(([age1], [age2]) => Number(age1) - Number(age2))
-              .map(([age, count]) => ({
-                'Пол': gender === 'M' ? 'Мужской' : 'Женский',
-                'Возраст': age,
-                'Количество': count
-              })));
-      case 3: // Воинский запас
-        return rawData
-          .filter(person => person.military)
-          .map(person => ({
-            'ФИО': `${person.surname} ${person.name} ${person.patronymic}`,
-            'Дата рождения': format(new Date(person.birthday), 'dd.MM.yyyy'),
-            'Звание': person.military.rank,
-            'Категория': person.military.military_category,
-            'Военный округ': person.military.military_district === 'army' ? 'РА' : 'ВМФ'
-          }));
-      case 4: // Военно-учетные признаки
+
+        const result = ageRanges.map((range, index) => ({
+          'Возрастная группа': range.name,
+          'Мужчины': counts['M'][index],
+          'Женщины': counts['W'][index],
+          'Всего': counts['M'][index] + counts['W'][index]
+        }));
+
+        result.push({
+          'Возрастная группа': 'Всего',
+          'Мужчины': totalM,
+          'Женщины': totalW,
+          'Всего': totalM + totalW
+        });
+
+        return result;
+      }
+      case 2: {
+        const ageGroups = [
+          { name: 'До 3 лет и младше', max: 3 },
+          { name: 'До 7 лет и младше', max: 7 },
+          { name: 'До 14 лет и младше', max: 14 },
+          { name: 'До 16 лет и младше', max: 16 },
+          { name: 'До 18 лет и младше', max: 18 }
+        ];
+
+        const counts = {
+          M: Array(ageGroups.length).fill(0),
+          W: Array(ageGroups.length).fill(0)
+        };
+
+        rawData.forEach(person => {
+          const birthDate = new Date(person.birthday);
+          const age = new Date().getFullYear() - birthDate.getFullYear();
+          const gender = person.gender;
+
+          for (let i = 0; i < ageGroups.length; i++) {
+            if (age <= ageGroups[i].max) {
+              counts[gender][i]++;
+            }
+          }
+        });
+
+        return ageGroups.map((group, index) => ({
+          'Возрастная группа': group.name,
+          'Мужчины': counts['M'][index],
+          'Женщины': counts['W'][index],
+          'Всего': counts['M'][index] + counts['W'][index]
+        }));
+      }
+      case 3: { 
+        let counter = 1;
         return rawData
           .filter(person => person.military && !person.military.called)
           .map(person => ({
-            'ФИО': `${person.surname} ${person.name} ${person.patronymic}`,
-            'Категория запаса': person.military.stock_category,
-            'Военно-учетная специальность': person.military.military_account_type,
-            'Звание': person.military.rank
+            '№ п/п': counter++,
+            'Фамилия': person.surname || '-',
+            'Имя': person.name || '-',
+            'Отчество': person.patronymic || '-',
+            'Воинский разряд': person.military.military_category ? `${person.military.military_category}` : '-',
+            'Категория запаса': person.military.stock_category ? `${person.military.stock_category}` : '-',
+            'Воинский состав': getMilitaryPersonnelDisplay(person.military.rank),
+            'Воинское звание': getRankDisplay(person.military.soldier_rank),
+            'Группа учета': person.military.military_district === 'army' ? 'РА' : 'ВМФ',
+            'Вид воинского учета': getAccountTypeDisplay(person.military.military_account_type)
           }));
+      }
+      case 4: { 
+        const militaryPersonnel = ['warrant', 'sergeant', 'soldier'];
+        const categories = [1, 2, 3];
+        
+        const result = [
+          ['', 'Состав', 'РА', 'ВМФ', 'Всего', 'РА', 'ВМФ', 'Всего', 'РА', 'ВМФ', 'Всего'],
+          ['', '', 'Всего', '', '', 'В т.ч. на общем учете', '', '', 'В т.ч. на специальном учете', '', '']
+        ];
+
+        const militaryData = rawData.filter(person => person.military && !person.military.called);
+
+        const getCounts = (category, personnel, accountType = null) => {
+          const armyCount = militaryData.filter(p => 
+            p.military.military_category === category &&
+            p.military.rank === personnel &&
+            p.military.military_district === 'army' &&
+            (accountType ? p.military.military_account_type === accountType : true)
+          ).length;
+
+          const navyCount = militaryData.filter(p => 
+            p.military.military_category === category &&
+            p.military.rank === personnel &&
+            p.military.military_district === 'navy' &&
+            (accountType ? p.military.military_account_type === accountType : true)
+          ).length;
+
+          return [armyCount, navyCount, armyCount + navyCount];
+        };
+
+        for (const category of categories) {
+          result.push([`${category} разряд`, 'Всего', 
+            ...getCounts(category, null),
+            ...getCounts(category, null, 'general'),
+            ...getCounts(category, null, 'special')
+          ]);
+
+          for (const personnel of militaryPersonnel) {
+            result.push([
+              '',
+              getMilitaryPersonnelDisplay(personnel),
+              ...getCounts(category, personnel),
+              ...getCounts(category, personnel, 'general'),
+              ...getCounts(category, personnel, 'special')
+            ]);
+          }
+        }
+
+        return result;
+      }
       default:
         return [];
     }
+  };
+
+  const loadAllPages = async (startDate, endDate) => {
+    let allData = [];
+    let nextPage = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await fetchPeople(startDate, endDate, nextPage, false);
+      allData = [...allData, ...response.results];
+      hasMore = response.next !== null;
+      nextPage += 1;
+    }
+
+    return allData;
   };
 
   const handleReportClick = async (index) => {
@@ -115,10 +257,17 @@ const Reports = () => {
       const formattedStartDate = format(startDate, 'yyyy-MM-dd');
       const formattedEndDate = format(endDate, 'yyyy-MM-dd');
       
-      const noPagination = index !== 0 && index !== 3;
-      const response = await fetchPeople(formattedStartDate, formattedEndDate, noPagination);
-      
-      const processedData = processData(noPagination ? response : response.results, index);
+      let response;
+      let processedData;
+
+      if (index === 0 || index === 3) {
+        response = await fetchPeople(formattedStartDate, formattedEndDate, 1, false);
+        processedData = processData(response.results, index);
+      } else {
+        response = await fetchPeople(formattedStartDate, formattedEndDate, 1, true);
+        processedData = processData(response, index);
+      }
+
       setData(processedData);
       setActiveReport(index);
       setPage(0);
@@ -128,17 +277,255 @@ const Reports = () => {
     }
   };
 
-  const handleExport = () => {
-    if (!data.length) return;
+  const handleExport = async () => {
+    if (!data.length || !startDate || !endDate) return;
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
-    XLSX.writeFile(wb, `report-${activeReport}-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    try {
+      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+      const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+
+      let exportData;
+      if (activeReport === 0 || activeReport === 3) {
+        const allData = await loadAllPages(formattedStartDate, formattedEndDate);
+        exportData = processData(allData, activeReport);
+      } else {
+        exportData = data;
+      }
+
+      const wb = XLSX.utils.book_new();
+      let ws;
+      
+      if (activeReport === 1) {
+        ws = XLSX.utils.aoa_to_sheet([
+          ['Численность населения по возрасту'],
+          ['Возрастная группа', 'Мужчины', 'Женщины', 'Всего'],
+          ...exportData.map(row => [
+            row['Возрастная группа'],
+            row['Мужчины'],
+            row['Женщины'],
+            row['Всего']
+          ])
+        ]);
+      } else if (activeReport === 2) {
+        const headers = [
+          'Возрастная группа', 'Мужчины', 'Женщины', 'Всего'
+        ];
+        ws = XLSX.utils.aoa_to_sheet([
+          ['Справка о численности населения в Брюшлинском сельском поселении до 18 лет'],
+          headers,
+          ...exportData.map(row => headers.map(header => row[header]))
+        ]);
+        
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } });
+      } else if (activeReport === 3) {
+        const headers = [
+          '№ п/п', 'Фамилия', 'Имя', 'Отчество', 'Воинский разряд', 
+          'Категория запаса', 'Воинский состав', 'Воинское звание', 'Группа учета', 'Вид воинского учета'
+        ];
+        ws = XLSX.utils.aoa_to_sheet([
+          ['Учет граждан, пребывающих в воинском запасе в Брюшлинском сельском поселении'],
+          headers,
+          ...exportData.map(row => headers.map(header => row[header]))
+        ]);
+        
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } });
+      } else if (activeReport === 4) {
+        ws = XLSX.utils.aoa_to_sheet(data);
+
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push(
+          { s: { r: 1, c: 2 }, e: { r: 1, c: 4 } },
+          { s: { r: 1, c: 5 }, e: { r: 1, c: 7 } },
+          { s: { r: 1, c: 8 }, e: { r: 1, c: 10 } }
+        );
+      } else {
+        ws = XLSX.utils.json_to_sheet(exportData, { header: Object.keys(exportData[0]) });
+      }
+
+      const headerStyle = {
+        font: { bold: true, sz: 12 },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin' },
+          bottom: { style: 'thin' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        }
+      };
+
+      const cellStyle = {
+        alignment: { horizontal: 'left', vertical: 'center' },
+        border: {
+          top: { style: 'thin' },
+          bottom: { style: 'thin' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        }
+      };
+      if (activeReport === 0) {
+        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
+      } else if (activeReport === 1) {
+        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+      } else if (activeReport === 2) {
+        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+      } else if (activeReport === 3) {
+        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }];
+      } else if (activeReport === 4) {
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+          { s: { r: 1, c: 2 }, e: { r: 1, c: 4 } },
+          { s: { r: 1, c: 5 }, e: { r: 1, c: 7 } },
+          { s: { r: 1, c: 8 }, e: { r: 1, c: 10 } }
+        ];
+      }
+
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell_address = { c: C, r: R };
+          const cell_ref = XLSX.utils.encode_cell(cell_address);
+          if (!ws[cell_ref]) continue;
+
+          ws[cell_ref].s = R === 1 ? headerStyle : cellStyle;
+        }
+      }
+
+      if (activeReport === 0) {
+        ws['!cols'] = [
+          { wch: 40 },
+          { wch: 15 }
+        ];
+      } else if (activeReport === 1) {
+        ws['!cols'] = [
+          { wch: 30 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 }
+        ];
+      } else if (activeReport === 2) {
+        ws['!cols'] = [
+          { wch: 20 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 }
+        ];
+      } else if (activeReport === 3) {
+        ws['!cols'] = [
+          { wch: 5 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 }
+        ];
+      } else if (activeReport === 4) {
+        ws['!cols'] = [
+          { wch: 20 },
+          { wch: 25 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 }
+        ];
+      }
+      
+      let sheetName, fileName;
+      
+      if (activeReport === 0) {
+        sheetName = 'Список лиц';
+        fileName = `Список лиц ${format(new Date(), 'dd.MM.yyyy')}.xlsx`;
+      } else if (activeReport === 1) {
+        sheetName = 'Численность';
+        fileName = `Численность населения по возрасту ${format(new Date(), 'dd.MM.yyyy')}.xlsx`;
+      } else if (activeReport === 2) {
+        sheetName = 'До 18 лет';
+        fileName = `Справка о численности населения до 18 лет ${format(new Date(), 'dd.MM.yyyy')}.xlsx`;
+      } else if (activeReport === 3) {
+        sheetName = 'Воинский учет';
+        fileName = `Учет граждан в воинском запасе ${format(new Date(), 'dd.MM.yyyy')}.xlsx`;
+      } else if (activeReport === 4) {
+        sheetName = 'Военно-учетные признаки';
+        fileName = `Характеристика военно-учетных признаков ${format(new Date(), 'dd.MM.yyyy')}.xlsx`;
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      alert('Ошибка при экспорте данных');
+    }
   };
 
   const renderTable = () => {
     if (!data.length) return null;
+
+    if (activeReport === 4) {
+      return (
+        <Paper sx={{ width: '100%', overflow: 'hidden', mt: 2 }}>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell colSpan={11} align="center" sx={{ fontWeight: 'bold', fontSize: '1.1em', py: 2 }}>
+                    {data[0][0]}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={2}></TableCell>
+                  <TableCell colSpan={3} align="center" sx={{ fontWeight: 'bold' }}>Всего</TableCell>
+                  <TableCell colSpan={3} align="center" sx={{ fontWeight: 'bold' }}>В т.ч. на общем учете</TableCell>
+                  <TableCell colSpan={3} align="center" sx={{ fontWeight: 'bold' }}>В т.ч. на специальном учете</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold', borderBottom: 'none' }}>Разряды</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', borderBottom: 'none' }}>Состав</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>РА</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>ВМФ</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>Всего</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>РА</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>ВМФ</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>Всего</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>РА</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>ВМФ</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderBottom: 'none' }}>Всего</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.slice(4).map((row, index) => (
+                  <TableRow key={index}>
+                    {row.map((cell, cellIndex) => (
+                      <TableCell 
+                        key={cellIndex}
+                        align={cellIndex > 1 ? 'center' : 'left'}
+                        sx={{
+                          fontWeight: String(cell || '').includes('разряд') ? 'bold' : 'normal',
+                          pl: cell === '' ? 4 : 2,
+                          py: 1.5
+                        }}
+                      >
+                        {cell}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      );
+    }
 
     const columns = Object.keys(data[0]).map(key => ({
       id: key,

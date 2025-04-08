@@ -5,9 +5,7 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Interceptor to handle CSRF token
 api.interceptors.request.use(async (config) => {
-  // Get CSRF token from cookie if it exists
   const csrfToken = document.cookie
     .split('; ')
     .find(row => row.startsWith('csrftoken='))
@@ -20,11 +18,15 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-export const fetchPeople = async (startDate, endDate, noPagination = false) => {
+export const fetchPeople = async (startDate, endDate, page = 1, noPagination = false) => {
   const params = {};
   if (startDate) params.start_date = startDate;
   if (endDate) params.end_date = endDate;
-  if (noPagination) params.no_pagination = true;
+  if (!noPagination) {
+    params.page = page;
+  } else {
+    params.no_pagination = true;
+  }
 
   const response = await api.get('/api/people/humans/', { params });
   return response.data;

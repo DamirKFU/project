@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import api from './services/api';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -39,14 +40,14 @@ function App() {
               <Button
                 color="inherit"
                 component="a"
-                href="http://127.0.0.1:8000/admin/login/"
+                href={`${api.defaults.baseURL}/admin/login/`}
               >
                 Логин
               </Button>
               <Button
                 color="inherit"
                 component="a"
-                href="http://127.0.0.1:8000/admin/"
+                href={`${api.defaults.baseURL}/admin/`}
               >
                 Админка
               </Button>
