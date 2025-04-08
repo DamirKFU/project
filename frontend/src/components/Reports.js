@@ -538,14 +538,14 @@ const Reports = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.slice(4).map((row, index) => (
+                {data.slice(2).map((row, index) => (
                   <TableRow key={index}>
                     {row.map((cell, cellIndex) => (
                       <TableCell 
                         key={cellIndex}
                         align={cellIndex > 1 ? 'center' : 'left'}
                         sx={{
-                          fontWeight: String(cell || '').includes('разряд') ? 'bold' : 'normal',
+                          fontWeight: String(cell || '').includes('разряд') || cell === 'Женщины' ? 'bold' : 'normal',
                           pl: cell === '' ? 4 : 2,
                           py: 1.5
                         }}
