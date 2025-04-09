@@ -24,6 +24,7 @@ export const fetchPeople = async (startDate, endDate, page = 1, noPagination = f
   if (endDate) params.end_date = endDate;
   if (!noPagination) {
     params.page = page;
+    params.page_size = 100;
   } else {
     params.no_pagination = true;
   }

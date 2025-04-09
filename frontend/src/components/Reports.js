@@ -32,6 +32,7 @@ const Reports = () => {
   const [data, setData] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [isExporting, setIsExporting] = useState(false);
 
   const getRankDisplay = (rank) => {
     const ranks = {
@@ -183,8 +184,8 @@ const Reports = () => {
         const categories = [1, 2, 3];
         
         const result = [
-          ['', 'Состав', 'РА', 'ВМФ', 'Всего', 'РА', 'ВМФ', 'Всего', 'РА', 'ВМФ', 'Всего'],
-          ['', '', 'Всего', '', '', 'В т.ч. на общем учете', '', '', 'В т.ч. на специальном учете', '', '']
+          ['Разряды', 'Состав', 'Всего', '', '', 'В т.ч. на общем учете', '', '', 'В т.ч. на специальном учете', '', ''],
+          ['', '', 'РА', 'ВМФ', 'Всего', 'РА', 'ВМФ', 'Всего', 'РА', 'ВМФ', 'Всего']
         ];
 
         const militaryData = rawData.filter(person => person.military && !person.military.called);
@@ -301,23 +302,32 @@ const Reports = () => {
     if (!data.length || !startDate || !endDate) return;
 
     try {
+      setIsExporting(true);
       const formattedStartDate = format(startDate, 'yyyy-MM-dd');
       const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+      const displayStartDate = format(startDate, 'dd.MM.yyyy');
+      const displayEndDate = format(endDate, 'dd.MM.yyyy');
 
       let exportData;
+      // Always load all data without pagination for exports
+      const allData = await loadAllPages(formattedStartDate, formattedEndDate);
       if (activeReport === 0 || activeReport === 3) {
-        const allData = await loadAllPages(formattedStartDate, formattedEndDate);
         exportData = processData(allData, activeReport);
       } else {
-        exportData = data;
+        // For other reports, we'll still process all data to ensure complete export
+        exportData = processData(allData, activeReport);
       }
 
       const wb = XLSX.utils.book_new();
       let ws;
       
+      const reportTitle = REPORTS[activeReport];
+      const titleWithDateRange = `${reportTitle} с ${displayStartDate} по ${displayEndDate}`;
+      
       if (activeReport === 1) {
         ws = XLSX.utils.aoa_to_sheet([
-          ['Численность населения по возрасту'],
+          [titleWithDateRange],
+          [],
           ['Возрастная группа', 'Мужчины', 'Женщины', 'Всего'],
           ...exportData.map(row => [
             row['Возрастная группа'],
@@ -326,12 +336,16 @@ const Reports = () => {
             row['Всего']
           ])
         ]);
+        
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } });
       } else if (activeReport === 2) {
         const headers = [
           'Возрастная группа', 'Мужчины', 'Женщины', 'Всего'
         ];
         ws = XLSX.utils.aoa_to_sheet([
-          ['Справка о численности населения в Брюшлинском сельском поселении до 18 лет'],
+          [titleWithDateRange],
+          [],
           headers,
           ...exportData.map(row => headers.map(header => row[header]))
         ]);
@@ -344,7 +358,8 @@ const Reports = () => {
           'Категория запаса', 'Воинский состав', 'Воинское звание', 'Группа учета', 'Вид воинского учета'
         ];
         ws = XLSX.utils.aoa_to_sheet([
-          ['Учет граждан, пребывающих в воинском запасе в Брюшлинском сельском поселении'],
+          [titleWithDateRange],
+          [],
           headers,
           ...exportData.map(row => headers.map(header => row[header]))
         ]);
@@ -352,59 +367,34 @@ const Reports = () => {
         if (!ws['!merges']) ws['!merges'] = [];
         ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } });
       } else if (activeReport === 4) {
-        ws = XLSX.utils.aoa_to_sheet(data);
+        ws = XLSX.utils.aoa_to_sheet([
+          [titleWithDateRange],
+          [],
+          ['Разряды', 'Состав', 'Всего', '', '', 'В т.ч. на общем учете', '', '', 'В т.ч. на специальном учете', '', ''],
+          ['', '', 'РА', 'ВМФ', 'Всего', 'РА', 'ВМФ', 'Всего', 'РА', 'ВМФ', 'Всего'],
+          ...exportData.slice(2)
+        ]);
 
         if (!ws['!merges']) ws['!merges'] = [];
         ws['!merges'].push(
-          { s: { r: 1, c: 2 }, e: { r: 1, c: 4 } },
-          { s: { r: 1, c: 5 }, e: { r: 1, c: 7 } },
-          { s: { r: 1, c: 8 }, e: { r: 1, c: 10 } }
+          // Title merges
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+          // Header row merges
+          { s: { r: 2, c: 0 }, e: { r: 3, c: 0 } }, // Разряды (height 2)
+          { s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }, // Состав (height 2)
+          { s: { r: 2, c: 2 }, e: { r: 2, c: 4 } }, // First "Всего" group
+          { s: { r: 2, c: 5 }, e: { r: 2, c: 7 } }, // "В т.ч. на общем учете" group 
+          { s: { r: 2, c: 8 }, e: { r: 2, c: 10 } }  // "В т.ч. на специальном учете" group
         );
-      } else {
-        ws = XLSX.utils.json_to_sheet(exportData, { header: Object.keys(exportData[0]) });
-      }
-
-      const headerStyle = {
-        font: { bold: true, sz: 12 },
-        alignment: { horizontal: 'center', vertical: 'center' },
-        border: {
-          top: { style: 'thin' },
-          bottom: { style: 'thin' },
-          left: { style: 'thin' },
-          right: { style: 'thin' }
-        }
-      };
-
-      const cellStyle = {
-        alignment: { horizontal: 'left', vertical: 'center' },
-        border: {
-          top: { style: 'thin' },
-          bottom: { style: 'thin' },
-          left: { style: 'thin' },
-          right: { style: 'thin' }
-        }
-      };
-      if (activeReport === 0) {
-        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
-      } else if (activeReport === 1) {
-        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
-      } else if (activeReport === 2) {
-        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
-      } else if (activeReport === 3) {
-        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }];
-      } else if (activeReport === 4) {
-        // Calculate row numbers for each category
-        const firstCategoryStart = 2;
+        
+        // Calculate row numbers for each category (adjusted for the added header rows)
+        const firstCategoryStart = 4;
         const secondCategoryStart = firstCategoryStart + 4;
         const thirdCategoryStart = secondCategoryStart + 4;
         const womenStart = thirdCategoryStart + 4;
 
-        ws['!merges'] = [
-          // Header merges
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
-          { s: { r: 1, c: 2 }, e: { r: 1, c: 4 } },
-          { s: { r: 1, c: 5 }, e: { r: 1, c: 7 } },
-          { s: { r: 1, c: 8 }, e: { r: 1, c: 10 } },
+        // Add category merges
+        ws['!merges'].push(
           // First category merges
           { s: { r: firstCategoryStart, c: 0 }, e: { r: firstCategoryStart + 3, c: 0 } },
           // Second category merges
@@ -413,9 +403,57 @@ const Reports = () => {
           { s: { r: thirdCategoryStart, c: 0 }, e: { r: thirdCategoryStart + 3, c: 0 } },
           // Women category merges
           { s: { r: womenStart, c: 0 }, e: { r: womenStart + 3, c: 0 } }
-        ];
+        );
+      } else {
+        // Report 0: Список лиц
+        const headers = ['ФИО', 'Дата рождения'];
+        ws = XLSX.utils.aoa_to_sheet([
+          [titleWithDateRange],
+          [],
+          headers,
+          ...exportData.map(row => headers.map(header => row[header]))
+        ]);
+        
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } });
       }
 
+      const titleStyle = {
+        font: { bold: true, sz: 14 },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: "000000" } },
+          bottom: { style: 'thin', color: { rgb: "000000" } },
+          left: { style: 'thin', color: { rgb: "000000" } },
+          right: { style: 'thin', color: { rgb: "000000" } }
+        }
+      };
+
+      const headerStyle = {
+        font: { bold: true, sz: 12 },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: "000000" } },
+          bottom: { style: 'thin', color: { rgb: "000000" } },
+          left: { style: 'thin', color: { rgb: "000000" } },
+          right: { style: 'thin', color: { rgb: "000000" } }
+        },
+        fill: {
+          fgColor: { rgb: "E0E0E0" }
+        }
+      };
+
+      const cellStyle = {
+        alignment: { horizontal: 'left', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: "000000" } },
+          bottom: { style: 'thin', color: { rgb: "000000" } },
+          left: { style: 'thin', color: { rgb: "000000" } },
+          right: { style: 'thin', color: { rgb: "000000" } }
+        }
+      };
+
+      // Apply styles to all cells
       const range = XLSX.utils.decode_range(ws['!ref']);
       for (let R = range.s.r; R <= range.e.r; ++R) {
         for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -423,10 +461,28 @@ const Reports = () => {
           const cell_ref = XLSX.utils.encode_cell(cell_address);
           if (!ws[cell_ref]) continue;
 
-          ws[cell_ref].s = R === 1 ? headerStyle : cellStyle;
+          // Apply appropriate style based on row
+          if (R === 0) {
+            ws[cell_ref].s = titleStyle;
+          } else if (R === 2 || R === 3) {
+            ws[cell_ref].s = headerStyle;
+          } else {
+            ws[cell_ref].s = cellStyle;
+          }
         }
       }
 
+      // Set column widths and row heights
+      if (!ws['!rows']) ws['!rows'] = [];
+      ws['!rows'][0] = { hpt: 30 }; // Title row height
+      
+      if (activeReport === 4) {
+        // Set row heights for the header rows in report 4
+        ws['!rows'][2] = { hpt: 25 }; // First header row
+        ws['!rows'][3] = { hpt: 25 }; // Second header row
+      }
+      
+      // Set column widths based on report type
       if (activeReport === 0) {
         ws['!cols'] = [
           { wch: 40 },
@@ -457,7 +513,6 @@ const Reports = () => {
           { wch: 15 },
           { wch: 15 },
           { wch: 15 },
-          { wch: 15 },
           { wch: 15 }
         ];
       } else if (activeReport === 4) {
@@ -475,7 +530,7 @@ const Reports = () => {
           { wch: 10 }
         ];
       }
-      
+
       let sheetName, fileName;
       
       if (activeReport === 0) {
@@ -500,6 +555,8 @@ const Reports = () => {
     } catch (error) {
       console.error('Error exporting data:', error);
       alert('Ошибка при экспорте данных');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -593,7 +650,7 @@ const Reports = () => {
             </TableBody>
           </Table>
         </TableContainer>
-        {(activeReport === 0 || activeReport === 3) && (
+        {!isExporting && (activeReport === 0 || activeReport === 3) && (
           <TablePagination
             rowsPerPageOptions={[10, 25, 100]}
             component="div"
@@ -670,8 +727,13 @@ const Reports = () => {
         </Grid>
         {data.length > 0 && (
           <Grid item xs={12}>
-            <Button variant="contained" onClick={handleExport}>
-              Экспорт в Excel
+            <Button
+              variant="contained"
+              onClick={handleExport}
+              disabled={isExporting}
+              sx={{ mb: 2 }}
+            >
+              {isExporting ? 'Экспорт...' : 'Экспорт в Excel'}
             </Button>
             {renderTable()}
           </Grid>
