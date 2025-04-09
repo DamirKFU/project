@@ -7,7 +7,7 @@ services:
     volumes:
       - ./nginx/cert.pem:/etc/nginx/cert.pem
       - ./nginx/key.pem:/etc/nginx/key.pem
-      - static_volume:/usr/share/nginx/html/staticfiles
+      - static_volume:/app/staticfiles
     depends_on:
       - django
 
@@ -17,7 +17,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app
-      - static_volume:/app/project/staticfiles
+      - static_volume:/app/staticfiles
     env_file:
       - ./project/.env
     expose:

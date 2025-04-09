@@ -9,5 +9,5 @@ COPY ./default.conf /etc/nginx/conf.d/default.conf
 COPY ./cert.pem /etc/nginx/cert.pem
 COPY ./key.pem /etc/nginx/key.pem
 
-# Копируем статические файлы в контейнер
-COPY ./staticfiles /usr/share/nginx/html/staticfiles/
+# # Копируем статические файлы в контейнер
+# COPY /app/project/staticfiles /usr/share/nginx/html/staticfiles/
